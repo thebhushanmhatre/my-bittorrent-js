@@ -27,7 +27,16 @@ function decodeList(bencodedValue) {
   let currentIndex = 1;
   let listValues = [];
   while (currentIndex < bencodedValue.length - 1) {
-    if (bencodedValue[currentIndex] == 'i') {
+    if (
+      bencodedValue[currentIndex] == 'l' &&
+      bencodedValue[bencodedValue.length - 2] == 'e'
+    ) {
+      // List inside list
+      listValues.push(
+        decodeList(bencodedValue.slice(currentIndex, bencodedValue.length - 1))
+      );
+      currentIndex = bencodedValue.length - 1;
+    } else if (bencodedValue[currentIndex] == 'i') {
       // integer
       const integerEndsAt =
         bencodedValue.slice(currentIndex).indexOf('e') + currentIndex + 1;
