@@ -15,58 +15,78 @@ function decodeInteger(bencodedValue) {
   return Number(bencodedValue.substr(1, bencodedValue.length - 2));
 }
 
-function decodeList(bencodedValue) {
+// <bencoded_elements> can be of the format: num:str or i<num>e
+// Break down into list and go on decoding each item
+// str: (\d:[a-zA-Z]{1,}) (\d:[a-zA-Z]+)
+// num: (i[\d]{1,}e)      (i[\d]+e)
+
+// const strRegex = /(\d+:\w+)*/;
+// const intRegex = /(i\d+e)*/;
+// const multiCombisListRegex = new RegExp(strRegex.source + intRegex.source + strRegex.source + intRegex);
+
+// ll3:hoti897e2:one5:supere => [["hot",897,"on"],"super"]
+//  ll3:hoti897ee5:supere => [["hot",897],"super"]
+function decodeList(bencodedValue, listValues = [], currentIndex = 1) {
   // Lists are encoded as l<bencoded_elements>e.
-
-  // <bencoded_elements> can be of the format: num:str or i<num>e
-  // Break down into list and go on decoding each item
-  // str: (\d:[a-zA-Z]{1,})
-  // num: (i[\d]{1,}e)
-
   // naive/brute force approach
-  let currentIndex = 1;
-  let listValues = [];
-  while (currentIndex < bencodedValue.length - 1) {
-    if (
-      bencodedValue[currentIndex] == 'l' &&
-      bencodedValue[bencodedValue.length - 2] == 'e'
-    ) {
-      // List inside list
-      listValues.push(
-        decodeList(bencodedValue.slice(currentIndex, bencodedValue.length - 1))
-      );
-      currentIndex = bencodedValue.length - 1;
-    } else if (bencodedValue[currentIndex] == 'i') {
-      // integer
-      const integerEndsAt =
-        bencodedValue.slice(currentIndex).indexOf('e') + currentIndex + 1;
-      const integerToDecode = bencodedValue.slice(currentIndex, integerEndsAt);
-
-      listValues.push(decodeInteger(integerToDecode));
-      currentIndex = integerEndsAt;
-    } else if (!isNaN(bencodedValue[currentIndex])) {
-      // string
-      // look for : and pick the nos
-      const firstColonIndex =
-        bencodedValue.slice(currentIndex).indexOf(':') + currentIndex;
-      const strLen = Number(bencodedValue.slice(currentIndex, firstColonIndex));
-      const strToDecode = bencodedValue.slice(
-        currentIndex,
-        firstColonIndex + strLen + 1
-      );
-
-      listValues.push(decodeStr(strToDecode));
-      currentIndex = firstColonIndex + strLen + 1;
-    } else {
-      throw new Error('Unable to decode ', {
-        currentIndex,
-        listValues,
-        currentStr: bencodedValue[currentIndex],
-      });
-    }
+  if (
+    currentIndex >= bencodedValue.length - 1 ||
+    bencodedValue[currentIndex] == 'e'
+  ) {
+    return listValues;
   }
 
-  return listValues;
+  if (bencodedValue[currentIndex] == 'l') {
+    // list - list can contain integer, string or other list
+    let nestedList = decodeList(bencodedValue, [], currentIndex + 1);
+
+    // for new index, find it using the last element from nestedList;
+    let newIndex;
+    const lastElement = nestedList[nestedList.length - 1];
+    if (typeof lastElement == 'number') {
+      let remainingItems = bencodedValue
+        .slice(currentIndex + 1)
+        .split(String(lastElement) + 'e')[1];
+      newIndex = bencodedValue.length - remainingItems.length + 1;
+    } else if (typeof lastElement == 'string') {
+      let remainingItems = bencodedValue
+        .slice(currentIndex + 1)
+        .split(lastElement)[1];
+      newIndex = bencodedValue.length - remainingItems.length + 1;
+    } else {
+      console.log('Shit');
+    }
+
+    listValues.push(nestedList);
+    return decodeList(bencodedValue, listValues, newIndex);
+  } else if (bencodedValue[currentIndex] == 'i') {
+    // integer: everything between i n e
+    const integerEndsAt =
+      bencodedValue.slice(currentIndex).indexOf('e') + currentIndex + 1;
+    const integerToDecode = bencodedValue.slice(currentIndex, integerEndsAt);
+    listValues.push(decodeInteger(integerToDecode));
+    currentIndex = integerEndsAt;
+    return decodeList(bencodedValue, listValues, currentIndex);
+  } else if (!isNaN(bencodedValue[currentIndex])) {
+    // string
+    // look for : and pick the nos
+    const firstColonIndex =
+      bencodedValue.slice(currentIndex).indexOf(':') + currentIndex;
+    const strLen = Number(bencodedValue.slice(currentIndex, firstColonIndex));
+    const strToDecode = bencodedValue.slice(
+      currentIndex,
+      firstColonIndex + strLen + 1
+    );
+    listValues.push(decodeStr(strToDecode));
+    currentIndex = firstColonIndex + strLen + 1;
+    return decodeList(bencodedValue, listValues, currentIndex);
+  } else {
+    throw new Error('Unable to decode ', {
+      currentIndex,
+      listValues,
+      currentStr: bencodedValue[currentIndex],
+    });
+  }
 }
 
 function decodeBencode(bencodedValue) {
