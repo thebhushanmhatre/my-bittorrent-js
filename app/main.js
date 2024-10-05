@@ -25,7 +25,7 @@ function decodeInteger(bencodedValue) {
 // const multiCombisListRegex = new RegExp(strRegex.source + intRegex.source + strRegex.source + intRegex);
 
 // ll3:hoti897e2:one5:supere => [["hot",897,"on"],"super"]
-//  ll3:hoti897ee5:supere => [["hot",897],"super"]
+// ll3:hoti897ee5:supere => [["hot",897],"super"]
 function decodeList(bencodedValue, listValues = [], currentIndex = 1) {
   // Lists are encoded as l<bencoded_elements>e.
   // naive/brute force approach
@@ -81,25 +81,101 @@ function decodeList(bencodedValue, listValues = [], currentIndex = 1) {
     currentIndex = firstColonIndex + strLen + 1;
     return decodeList(bencodedValue, listValues, currentIndex);
   } else {
-    throw new Error('Unable to decode ', {
-      currentIndex,
-      listValues,
-      currentStr: bencodedValue[currentIndex],
-    });
+    throw new Error('Unable to decode ');
+  }
+}
+
+function decodeDictionary(bencodedValue, result = {}, currentIndex = 1) {
+  // A dictionary is encoded as d<key1><value1>...<keyN><valueN>e.
+  // <key1>, <value1> etc. correspond to the bencoded keys & values.
+  // The keys are sorted in lexicographical order and must be strings.
+  // For example, {"hello": 52, "foo":"bar"} would be encoded as: d3:foo3:bar5:helloi52ee
+
+  if (
+    currentIndex >= bencodedValue.length - 1 ||
+    bencodedValue[currentIndex] == 'e'
+  ) {
+    return result;
+  }
+
+  // key must string,
+  // extract key
+  const firstColonIndex = bencodedValue.slice(currentIndex).indexOf(':');
+  if (firstColonIndex === -1) {
+    throw new Error('Invalid encoded value', bencodedValue);
+  }
+  const keyLen = Number(
+    bencodedValue.slice(currentIndex, currentIndex + firstColonIndex)
+  );
+  const valueStartIndex = currentIndex + firstColonIndex + keyLen + 1; // +1 to go to next char after key
+  const key = bencodedValue.substr(currentIndex + firstColonIndex + 1, keyLen);
+
+  // extract value and then iterate to next key-value pair
+  if (bencodedValue[valueStartIndex] == 'l') {
+    // list - list can contain integer, string or other list
+    let nestedList = decodeList(bencodedValue, [], valueStartIndex + 1);
+
+    // for new index, find it using the last element from nestedList;
+    let newIndex;
+    const lastElement = nestedList[nestedList.length - 1];
+    if (typeof lastElement == 'number') {
+      let remainingItems = bencodedValue
+        .slice(valueStartIndex + 1)
+        .split(String(lastElement) + 'e')[1];
+      newIndex = bencodedValue.length - remainingItems.length + 1;
+    } else if (typeof lastElement == 'string') {
+      let remainingItems = bencodedValue
+        .slice(valueStartIndex + 1)
+        .split(lastElement)[1];
+      newIndex = bencodedValue.length - remainingItems.length + 1;
+    } else {
+      console.log('Shit');
+    }
+
+    result[key] = nestedList;
+    return decodeDictionary(bencodedValue, result, newIndex);
+  } else if (bencodedValue[valueStartIndex] == 'i') {
+    // integer: everything between i n e
+    const integerEndsAt =
+      bencodedValue.slice(valueStartIndex).indexOf('e') + valueStartIndex + 1;
+    const integerToDecode = bencodedValue.slice(valueStartIndex, integerEndsAt);
+
+    result[key] = decodeInteger(integerToDecode);
+    const nextCurrentIndex = integerEndsAt;
+    return decodeDictionary(bencodedValue, result, nextCurrentIndex);
+  } else if (!isNaN(bencodedValue[valueStartIndex])) {
+    // string
+    // look for : and pick the nos
+    const firstColonIndex =
+      bencodedValue.slice(valueStartIndex).indexOf(':') + valueStartIndex;
+    const strLen = Number(
+      bencodedValue.slice(valueStartIndex, firstColonIndex)
+    );
+    const strToDecode = bencodedValue.slice(
+      valueStartIndex,
+      firstColonIndex + strLen + 1
+    );
+    result[key] = decodeStr(strToDecode);
+    const nextCurrentIndex = firstColonIndex + strLen + 1;
+    return decodeDictionary(bencodedValue, result, nextCurrentIndex);
+  } else {
+    throw new Error('Unable to decode ');
   }
 }
 
 function decodeBencode(bencodedValue) {
   const lastChar = bencodedValue[bencodedValue.length - 1];
 
-  if (bencodedValue[0] == 'l' && lastChar == 'e') {
+  if (bencodedValue[0] == 'd' && lastChar == 'e') {
+    return decodeDictionary(bencodedValue);
+  } else if (bencodedValue[0] == 'l' && lastChar == 'e') {
     return decodeList(bencodedValue);
   } else if (bencodedValue[0] == 'i' && lastChar == 'e') {
     return decodeInteger(bencodedValue);
   } else if (!isNaN(bencodedValue[0])) {
     return decodeStr(bencodedValue);
   } else {
-    throw new Error('Unable to decode ', bencodedValue);
+    throw new Error('Unable to decode ');
   }
 }
 
