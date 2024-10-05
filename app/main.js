@@ -85,6 +85,9 @@ function decodeList(bencodedValue, listValues = [], currentIndex = 1) {
   }
 }
 
+// d3:foo6:orange5:helloi52ee => {"foo":"orange","hello":52}
+// d10:inner_dictd4:key16:value14:key2i42e8:list_keyl5:item15:item2i3eeee
+// => {"inner_dict":{"key1":"value1","key2":42,"list_key":["item1","item2",3]}}
 function decodeDictionary(bencodedValue, result = {}, currentIndex = 1) {
   // A dictionary is encoded as d<key1><value1>...<keyN><valueN>e.
   // <key1>, <value1> etc. correspond to the bencoded keys & values.
@@ -111,7 +114,17 @@ function decodeDictionary(bencodedValue, result = {}, currentIndex = 1) {
   const key = bencodedValue.substr(currentIndex + firstColonIndex + 1, keyLen);
 
   // extract value and then iterate to next key-value pair
-  if (bencodedValue[valueStartIndex] == 'l') {
+  if (bencodedValue[valueStartIndex] == 'd') {
+    // Nested Dictionary
+    const nestedDict = decodeDictionary(bencodedValue, {}, valueStartIndex + 1);
+    result[key] = nestedDict;
+
+    // for new index, cannot use the last element because order changes in dict
+    // return decodeDictionary(bencodedValue, result, newIndex);
+
+    // trying to skip some cases
+    return result;
+  } else if (bencodedValue[valueStartIndex] == 'l') {
     // list - list can contain integer, string or other list
     let nestedList = decodeList(bencodedValue, [], valueStartIndex + 1);
 
@@ -159,9 +172,23 @@ function decodeDictionary(bencodedValue, result = {}, currentIndex = 1) {
     const nextCurrentIndex = firstColonIndex + strLen + 1;
     return decodeDictionary(bencodedValue, result, nextCurrentIndex);
   } else {
+    console.log('ELSE', {
+      currentIndex,
+      firstColonIndex,
+      keyLen,
+      valueStartIndex,
+      startChar: bencodedValue[valueStartIndex],
+      key,
+      result,
+    });
     throw new Error('Unable to decode ');
   }
 }
+// d10:inner_ d  i  ctd4:key 1  6:value14  : key2i42e8  : list_keyl  5 :item15:i  t em2i3eeee
+// 0123456789 10 11 23456789 20 123456789 30 123456789 40 123456789 50 123456789 60 123456789
+
+// d10:inner_ d ictd4:key 1 6:value14  : key2i42e8  : list_keyl  5 :item15:i  t em2i3eee4  :spam5:ema  ile
+// 0123456789101123456789 20 123456789 30 123456789 40 123456789 50 123456789 60 123456789 70123456789 802
 
 function decodeBencode(bencodedValue) {
   const lastChar = bencodedValue[bencodedValue.length - 1];
