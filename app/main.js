@@ -47,7 +47,7 @@ function main() {
     console.log(encodedData);
   } else if (command === 'info') {
     const filePath = process.argv[3];
-    fs.readFile(filePath, 'utf8', (err, data) => {
+    fs.readFile(filePath, 'binary', (err, data) => {
       if (err) {
         console.error(err);
         return;
