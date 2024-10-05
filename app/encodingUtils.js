@@ -26,7 +26,7 @@ function encodeInBencode(data) {
     result += encodedKey + encodedValue;
   });
 
-  return result;
+  return 'd' + result + 'e';
 }
 
 module.exports = { encodeInBencode };
