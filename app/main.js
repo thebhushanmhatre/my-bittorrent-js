@@ -61,6 +61,12 @@ function main() {
     const digestResult = shasum.digest('hex');
 
     console.log('Info Hash:', digestResult);
+
+    console.log('Piece Length:', decodedData.info['piece length']);
+    console.log(
+      'Piece Hashes:',
+      Buffer.from(decodedData.info.pieces, 'binary').toString('hex')
+    );
   } else {
     throw new Error(`Unknown command ${command}`);
   }
