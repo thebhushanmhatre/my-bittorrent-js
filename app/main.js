@@ -47,24 +47,20 @@ function main() {
     console.log(encodedData);
   } else if (command === 'info') {
     const filePath = process.argv[3];
-    fs.readFile(filePath, 'binary', (err, data) => {
-      if (err) {
-        console.error(err);
-        return;
-      }
+    const buff = fs.readFileSync(filePath);
 
-      const decodedData = decodeBencode(data);
-      console.log('Tracker URL:', decodedData.announce);
-      console.log('Length:', decodedData.info.length);
+    const decodedData = decodeBencode(buff.toString('binary'));
+    console.log('Tracker URL:', decodedData.announce);
+    console.log('Length:', decodedData.info.length);
 
-      const bencodedInfoDict = encodeInBencode(decodedData.info);
+    const bencodedInfoDict = encodeInBencode(decodedData.info);
+    const tmpBuff = Buffer.from(bencodedInfoDict, 'binary');
 
-      const shasum = crypto.createHash('sha1');
-      shasum.update(bencodedInfoDict);
-      const digestResult = shasum.digest('hex');
+    const shasum = crypto.createHash('sha1');
+    shasum.update(tmpBuff);
+    const digestResult = shasum.digest('hex');
 
-      console.log('Info Hash:', digestResult);
-    });
+    console.log('Info Hash:', digestResult);
   } else {
     throw new Error(`Unknown command ${command}`);
   }
